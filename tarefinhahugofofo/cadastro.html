@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Cadastro - É CUIUDO</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-image: url('https://media.tenor.com/WlJsOVX2lysAAAAj/cat-tongue-cat.gif');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(6px);
+      border-radius: 20px;
+      padding: 30px 25px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #302b63;
+      font-size: 28px;
+      text-shadow: 1px 1px 0 rgba(255,255,255,0.6);
+    }
+
+    label {
+      display: block;
+      text-align: left;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+
+    input:focus {
+      border-color: #7b2ff7;
+      box-shadow: 0 0 8px rgba(123, 47, 247, 0.3);
+      outline: none;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #7b2ff7, #2e0260);
+      color: white;
+      border: none;
+      padding: 14px;
+      width: 100%;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+      margin-top: 15px;
+    }
+
+    .btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .link-login {
+      display: inline-block;
+      margin-top: 15px;
+      color: white;
+      background: #222;
+      padding: 8px 20px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    .link-login:hover {
+      background: #7b2ff7;
+    }
+
+    /* Mensagens de retorno */
+    .mensagem {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-weight: bold;
+      display: none; /* será mostrada se houver parâmetro na URL */
+    }
+
+    .erro {
+      background: #ffebee;
+      color: #d32f2f;
+      display: block;
+    }
+
+    .sucesso {
+      background: #e8f5e9;
+      color: #2e7d32;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🐱 SE CADASTRA SE É CUIUDO</h1>
+
+    <!-- Exibe mensagem se vier da URL (ex: ?erro=... ou ?sucesso=...) -->
+    <div id="mensagem" class="mensagem"></div>
+
+    <form method="post" action="cadastro.php">
+      <label>Email ou Numero</label>
+      <input name="emailnumero" type="text" autocomplete="off" required placeholder="Ex: cuiudo@email.com, 1199999999 ou CPF">
+
+      <label>Senha</label>
+      <input name="senha" type="password" autocomplete="off" required placeholder="Mín. 8 caracteres, 1 maiúscula, 1 número, 1 símbolo">
+
+      <label>Confirma a senha aí, Zé</label>
+      <input name="confirmar_senha" type="password" autocomplete="off" required placeholder="Repita a senha">
+
+      <button type="submit" class="btn">Cadastrar</button>
+    </form>
+
+    <a href="login.php" class="link-login">Já é cuiudo? Volta pro login!</a>
+  </div>
+
+  <script>
+    // Pega os parâmetros da URL e mostra a mensagem adequada
+    const params = new URLSearchParams(window.location.search);
+    const msgDiv = document.getElementById('mensagem');
+
+    if (params.has('erro')) {
+      msgDiv.textContent = decodeURIComponent(params.get('erro'));
+      msgDiv.classList.add('erro');
+    } else if (params.has('sucesso')) {
+      msgDiv.textContent = decodeURIComponent(params.get('sucesso'));
+      msgDiv.classList.add('sucesso');
+    }
+  </script>
+</body>
+</html>

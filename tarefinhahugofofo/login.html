@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - SE É CUIUDO</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-image: url('https://media.tenor.com/WlJsOVX2lysAAAAj/cat-tongue-cat.gif');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(6px);
+      border-radius: 20px;
+      padding: 30px 25px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #302b63;
+      font-size: 28px;
+      text-shadow: 1px 1px 0 rgba(255,255,255,0.6);
+    }
+
+    label {
+      display: block;
+      text-align: left;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border 0.3s, box-shadow 0.3s;
+    }
+
+    input:focus {
+      border-color: #7b2ff7;
+      box-shadow: 0 0 8px rgba(123, 47, 247, 0.3);
+      outline: none;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #28a745, #1e7e34);
+      color: white;
+      border: none;
+      padding: 14px;
+      width: 100%;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+      margin-top: 15px;
+    }
+
+    .btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .link-cadastro {
+      display: inline-block;
+      margin-top: 15px;
+      color: white;
+      background: #222;
+      padding: 8px 20px;
+      border-radius: 30px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    .link-cadastro:hover {
+      background: #7b2ff7;
+    }
+
+    /* Mensagens de retorno */
+    .mensagem {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-weight: bold;
+      display: none;
+    }
+
+    .erro {
+      background: #ffebee;
+      color: #d32f2f;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🐱 FAZ LOGIN AÊ, CUIUDO</h1>
+
+    <!-- lugar onde a mensagem de erro aparece (vinda da URL) -->
+    <div id="mensagem" class="mensagem"></div>
+
+    <form method="post" action="login.php">
+      <label>Email, Número ou CPF:</label>
+      <input name="emailnumero" type="text" autocomplete="off" required placeholder="Ex: cuiudo@email.com, 1199999999 ou CPF">
+
+      <label>Senha:</label>
+      <input name="senha" type="password" autocomplete="off" required placeholder="Sua senha secreta">
+
+      <button type="submit" class="btn">Entrar</button>
+    </form>
+
+    <a href="cadastro.html" class="link-cadastro">Ainda não é cadastrado? bicho vei besta, cadastra aqui ó!</a>
+  </div>
+
+  <script>
+    // Lê o parâmetro 'erro' da URL e exibe a mensagem
+    const params = new URLSearchParams(window.location.search);
+    const msgDiv = document.getElementById('mensagem');
+    if (params.has('erro')) {
+      msgDiv.textContent = decodeURIComponent(params.get('erro'));
+      msgDiv.classList.add('erro');
+    }
+  </script>
+</body>
+</html>
