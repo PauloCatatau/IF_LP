@@ -1,70 +1,87 @@
+<html>
+<head>
+<style>
+    body {
+        background-image: url('https://media1.tenor.com/m/LK628grSBnEAAAAC/cat-ai-pufferfish-cat.gif');
+        background-repeat: no-repeat;
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        height: auto;
+        margin: 0;
+        color: greenyellow; 
+    }
+</style>
+</head>
+<body>
+<h1>SE CADASTRA SE É CUIUDO</h1>
+
+<form method="post" action="">
+    <label>Email ou Numero</label>
+    <input name="emailnumero" size="25" type="text" autocomplete="off" required placeholder="Ex: cuiudo@email.com, 1199999999">
+    <br><br>
+
+    <label>Senha</label>
+    <input name="senha1" size="25" type="password" autocomplete="off" required placeholder="Mín. 8 caracteres, 1 maiúscula, 1 número, 1 símbolo">
+    <br><br>
+    
+    <label> Confirmar senha</label>
+    <input name="senha2" size="25" type="password" autocomplete="off" required placeholder="Repita a senha">
+    <br><br>	
+
+    <button type="submit" name="cadastrar">Cadastrar</button>
+</form>
+
+<form method="post" action="">
+    <button type="submit" name="1">Já é Cuiudo? não perdi tempo, entra em nois zé!</button>
+</form>
+</body>
+</html>
+
 <?php
 include "conexao.php";
-include "cadastro.html";
 
 if (isset($_POST['cadastrar'])):
 
     $emailnumero = trim($_POST['emailnumero']); 
-    $senha = trim($_POST['senha']);
-    $confirmar_senha = trim($_POST['confirmar_senha']);
+    $senha1 = trim($_POST['senha1']);
+    $senha2 = trim($_POST['senha2']);
 
-    // Confere se as senhas batem
-    if ($senha !== $confirmar_senha) {
-        echo "As senha tão diferente, macho! Digita igual aí!";
+    if ($senha1 !== $senha2) {
+        echo "Senha diferente, digita igual aí!";
         exit;
     }
 
-    // Força da senha (a sua original)
-    if (strlen($senha) < 8 || 
-        !preg_match('/[A-Z]/', $senha) || 
-        !preg_match('/[a-z]/', $senha) || 
-        !preg_match('/[0-9]/', $senha) || 
-        !preg_match('/[!@#$%^&*()]/', $senha)) {
-        echo "Senha: 8+ caracteres, letra maiúscula, letra minúscula, número e caractere especial paizão!!!!!!";
+    if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[\W_]).{8,}$/', $senha1)) {
+        echo "Senha fraca! Precisa: 8+ caracteres, maiúscula, minúscula, número e símbolo!";
         exit;
     }
- 
-    // Função para validar CPF (sua, não muda nada)
-    function validaCPF($cpf) {
-        $cpf = preg_replace('/[^0-9]/', '', $cpf);
-        if (strlen($cpf) != 11) return false;
-        if (preg_match('/(\d)\1{10}/', $cpf)) return false;
-        for ($t = 9; $t < 11; $t++) {
-            for ($d = 0, $c = 0; $c < $t; $c++) $d += $cpf[$c] * (($t + 1) - $c);
-            $d = ((10 * $d) % 11) % 10;
-            if ($cpf[$c] != $d) return false;
-        }
-        return true;
-    }
 
-    $is_cpf = validaCPF($emailnumero); 
     $is_email = filter_var($emailnumero, FILTER_VALIDATE_EMAIL);
     $is_telefone = preg_match('/^[0-9]{10,11}$/', $emailnumero);
 
-    if (!$is_email && !$is_telefone && !$is_cpf) {
+    if (!$is_email && !$is_telefone) {
         echo "Bota algo que presta macho! >:(";
         exit;
     }
 
-    // CPF vai hasheado, email/telefone fica puro
-    if ($is_cpf) {
-        $emailnumero_final = password_hash($emailnumero, PASSWORD_DEFAULT);
-    } else {
-        $emailnumero_final = $emailnumero;
-    }
-
-    $senha_final = password_hash($senha, PASSWORD_DEFAULT);
+    $senhafinal = password_hash($senha1, PASSWORD_DEFAULT);
 
     $sql = mysqli_query($conexao, 
-        "INSERT INTO `usuarios`(`emailnumero`, `senha`) 
-         VALUES ('$emailnumero_final','$senha_final')"
+        "INSERT INTO cad_user (emailnumero, senha) 
+         VALUES ('$emailnumero','$senhafinal')"
     );
 
     if ($sql) {
         echo "É cuiudo mesmo!!!!";
     } else {
-        echo "Erro ao comprovar cuiosidade: " . mysqli_error($conexao);
-    } 
+        echo "Erro ao comprovar cuiosidade: é macio (lá ele). " . mysqli_error($conexao);
+    }
 
+endif;
+
+if (isset($_POST['1'])):
+    header("Location: login.php");
+    exit;
 endif;
 ?>

@@ -1,74 +1,98 @@
 <?php
 session_start();
 include "conexao.php";
-include "login.html";
 
-// Função reciclada do cadastro (validaCPF)
-function validaCPF($cpf) {
-    $cpf = preg_replace('/[^0-9]/', '', $cpf);
-    if (strlen($cpf) != 11) return false;
-    if (preg_match('/(\d)\1{10}/', $cpf)) return false;
-    for ($t = 9; $t < 11; $t++) {
-        for ($d = 0, $c = 0; $c < $t; $c++) {
-            $d += $cpf[$c] * (($t + 1) - $c);
-        }
-        $d = ((10 * $d) % 11) % 10;
-        if ($cpf[$c] != $d) return false;
-    }
-    return true;
-}
+if (isset($_POST['login'])) {
+    $emailnumero = trim($_POST['emailnumero']);
+    $senha = trim($_POST['senha']);
 
-$erro = "";
+    $is_email = filter_var($emailnumero, FILTER_VALIDATE_EMAIL);
+    $is_telefone = preg_match('/^[0-9]{10,11}$/', $emailnumero);
 
-// Nova função: tenta achar o cuido no banco
-function cacarCuiudo($conexao, $login_digitado, $senha_digitada) {
-    $sql = "SELECT emailnumero, senha FROM `usuarios`";
-    $query = mysqli_query($conexao, $sql);
-    
-    // Limpa o login caso seja CPF (pra comparar com hash depois)
-    $cpf_sem_mascara = preg_replace('/[^0-9]/', '', $login_digitado);
-    $eh_cpf_valido = validaCPF($login_digitado); // true se for CPF de verdade
-    
-    while ($registro = mysqli_fetch_assoc($query)) {
-        $campo = $registro['emailnumero'];
-        
-        // Se o campo começa com '$2y$' (marca do password_hash) → CPF criptografado
-        if (str_starts_with($campo, '$2y$')) {
-            // Só confere se o cara digitou um CPF válido E o hash bate
-            if ($eh_cpf_valido && password_verify($cpf_sem_mascara, $campo)) {
-                // Beleza, agora vê se a senha também tá certa
-                if (password_verify($senha_digitada, $registro['senha'])) {
-                    return $registro; // achou o danado
-                }
+    if (!$is_email && !$is_telefone) {
+        $erro = "Bota algo que presta macho! >:(";
+    } else {
+        $stmt = $conexao->prepare("SELECT id, emailnumero, senha FROM cad_user WHERE emailnumero = ?");
+        $stmt->bind_param("s", $emailnumero);
+        $stmt->execute();
+        $resultado = $stmt->get_result();
+
+        if ($resultado->num_rows > 0) {
+            $usuario = $resultado->fetch_assoc();
+
+            if (password_verify($senha, $usuario['senha'])) {
+                $_SESSION['usuario'] = $emailnumero;
+                $_SESSION['id'] = $usuario['id'];
+                $_SESSION['emailnumero'] = $usuario['emailnumero'];
+
+                header("Location: telainicial.php");
+                exit;
+            } else {
+                $erro = "Senha errada!";
             }
         } else {
-            // É email ou telefone (guardado em texto puro)
-            if ($campo === $login_digitado && password_verify($senha_digitada, $registro['senha'])) {
-                return $registro; // achou!
-            }
+            $erro = "Usuário não encontrado!";
         }
+
+        $stmt->close();
     }
-    
-    return false; // não achou ninguém :(
 }
 
-$erro = '';
-
-if (isset($_POST['entrar'])) {
-    $login_do_macho = trim($_POST['emailnumero']);
-    $senha_do_macho = trim($_POST['senha']);
-    
-    // Chama a caçadora
-    $cuiudo = cacarCuiudo($conexao, $login_do_macho, $senha_do_macho);
-    
-    if ($cuiudo) {
-        // Guarda o identificador na sessão (pode ser CPF, email ou telefone original)
-        $_SESSION['usuario_login'] = $cuiudo['emailnumero'];
-        // Redireciona pra onde você quiser (ex.: formulario.php, dashboard.php...)
-        header("Location: formulario.php");
-        exit;
-    } else {
-        $erro = "Oxe, login ou senha errada, Zé! Tenta de novo aí.";
-    }
+if (isset($_POST['cadastro'])) {
+    header("Location: cadastro.php");
+    exit;
 }
 ?>
+
+<html>
+<head>
+<style>
+    body {
+        background-image: url('https://media1.tenor.com/m/COlIBa50gfQAAAAC/freaky-ahh-cat.gif');
+        background-repeat: no-repeat;
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        height: auto;
+        margin: 0;
+        color: greenyellow;
+        text-align: center;
+    }
+
+    input, button {
+        padding: 8px;
+        border-radius: 5px;
+        border: none;
+    }
+
+    button { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>JÁ É CUIUDO? ENTRA EM NOIS!</h1>
+
+<?php if (isset($erro)) echo "<p>$erro</p>"; ?>
+
+<form method="post">
+    <label>Email ou Numero</label>
+    <input name="emailnumero" size="25" type="text" required>
+    <br><br>
+
+    <label>Senha</label>
+    <input name="senha" size="25" type="password" required>
+    <br><br>
+    
+    <button type="submit" name="login">Login</button>
+</form>
+
+<p><a href="senha.php" style="color: #3bff5f; text-decoration: none;">Esqueci minha senha</a></p>
+
+<br>
+
+<form method="post">
+    <button type="submit" name="cadastro">Voltar para o cadastro</button>
+</form>
+
+</body>
+</html>
