@@ -67,15 +67,18 @@ if (isset($_POST['cadastrar'])):
 
     $senhafinal = password_hash($senha1, PASSWORD_DEFAULT);
 
-    $sql = mysqli_query($conexao, 
-        "INSERT INTO cad_user (emailnumero, senha) 
-         VALUES ('$emailnumero','$senhafinal')"
-    );
+    try {
+        $stmt = mysqli_prepare($conexao, "INSERT INTO cad_user (emailnumero, senha) VALUES (?, ?)");
+        mysqli_stmt_bind_param($stmt, "ss", $emailnumero, $senhafinal);
+        mysqli_stmt_execute($stmt);
 
-    if ($sql) {
         echo "É cuiudo mesmo!!!!";
-    } else {
-        echo "Erro ao comprovar cuiosidade: é macio (lá ele). " . mysqli_error($conexao);
+    } catch (mysqli_sql_exception $e) {
+        if ($e->getCode() === 1062) {
+            echo "Esse email ou número já está cadastrado!";
+        } else {
+            echo "Erro ao comprovar cuiosidade: é macio (lá ele). " . $e->getMessage();
+        }
     }
 
 endif;

@@ -12,7 +12,7 @@ require __DIR__ . '/vendor/autoload.php';
 // 2. Em vez da senha normal, crie uma "Senha de app" do Google:
 //    myaccount.google.com > Segurança > Verificação em duas etapas > Senhas de app
 define('GMAIL_USER', 'paulocatatau5@gmail.com'); // email que envia
-define('GMAIL_PASS', 'gtjs murp fvly msqi'); // senha de app (16 chars sem espaço)
+define('GMAIL_PASS', 'zjed bhuq jquv xowq'); // senha de app (16 chars sem espaço)
 
 $msg  = "";
 $erro = "";
@@ -29,6 +29,13 @@ if (isset($_POST['recuperar'])) {
         $result = $stmt->get_result();
 
         if ($result->num_rows > 0) {
+            // Registra a intenção antes de tentar conectar ao SMTP.
+            $log = $conexao->prepare("INSERT INTO historico_recuperacao (email, enviado) VALUES (?, 0)");
+            $log->bind_param("s", $email);
+            $log->execute();
+            $historico_id = $conexao->insert_id;
+            $log->close();
+
             // Gera token seguro
             $token     = bin2hex(random_bytes(32));
             $expiracao = date('Y-m-d H:i:s', strtotime('+1 hour'));
@@ -67,6 +74,10 @@ if (isset($_POST['recuperar'])) {
                     "Se não foi você, ignora esse email e segue o baile.";
 
                 $mail->send();
+                $log = $conexao->prepare("UPDATE historico_recuperacao SET enviado = 1 WHERE id = ?");
+                $log->bind_param("i", $historico_id);
+                $log->execute();
+                $log->close();
                 $msg = "Email enviado pro cuiudo paulocatatau5@gmail.com! Vai lá verificar.";
             } catch (Exception $e) {
                 $erro = "Erro ao enviar email: " . $mail->ErrorInfo;
@@ -114,8 +125,16 @@ if (isset($_POST['recuperar'])) {
     <label>Seu Email</label><br><br>
     <input name="email" size="25" type="email" required placeholder="seuemail@email.com" autocomplete="off">
     <br><br>
-    <button type="submit" name="recuperar">Manda o link aí!</button>
+    <button type="submit" name="recuperar" id="botao-recuperar">Manda o link aí!</button>
 </form>
+
+<script>
+document.querySelector('form').addEventListener('submit', function () {
+    const botao = document.getElementById('botao-recuperar');
+    botao.disabled = true;
+    botao.textContent = 'Enviando...';
+});
+</script>
 
 <br>
 
