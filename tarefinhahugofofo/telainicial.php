@@ -31,23 +31,31 @@ $usuario    = $_SESSION['usuario'];
 $usuario_id = $_SESSION['id'];
 $msg        = "";
 $erro       = "";
+$admins     = ['catataubocamole767@gmail.com', 'paulocatatau5@gmail.com'];
+$eh_admin   = in_array(strtolower($usuario), $admins, true);
 
 // Página ativa via GET (cadastrar | editar | consultar), padrão = cadastrar
 $pagina = isset($_GET['pagina']) ? $_GET['pagina'] : 'cadastrar';
+if ($pagina === 'relatorio' && !$eh_admin) {
+    $pagina = 'consultar';
+    $erro = 'Acesso restrito aos administradores.';
+}
 
 // ── CADASTRAR TAREFA ──────────────────────────────────────────────────────────
 if (isset($_POST['cadastrar_tarefa'])) {
     $titulo     = trim($_POST['titulo']);
     $descricao  = trim($_POST['descricao']);
     $prioridade = trim($_POST['prioridade']);
+    $prazo      = trim($_POST['prazo'] ?? '');
+    $prazo      = $prazo !== '' ? $prazo : null;
 
     if (empty($titulo)) {
         $erro = "Bota um título aí cuiudo!";
     } else {
         $stmt = $conexao->prepare(
-            "INSERT INTO tarefas (usuario_id, titulo, descricao, prioridade) VALUES (?, ?, ?, ?)"
+            "INSERT INTO tarefas (usuario_id, titulo, descricao, prioridade, prazo) VALUES (?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param("isss", $usuario_id, $titulo, $descricao, $prioridade);
+        $stmt->bind_param("issss", $usuario_id, $titulo, $descricao, $prioridade, $prazo);
         $stmt->execute() ? $msg = "Tarefa criada, cuiudo!" : $erro = "Erro: " . $conexao->error;
         $stmt->close();
     }
@@ -61,14 +69,16 @@ if (isset($_POST['salvar_edicao'])) {
     $descricao  = trim($_POST['descricao']);
     $prioridade = trim($_POST['prioridade']);
     $status     = trim($_POST['status']);
+    $prazo      = trim($_POST['prazo'] ?? '');
+    $prazo      = $prazo !== '' ? $prazo : null;
 
     if (empty($titulo)) {
         $erro = "Título não pode ficar vazio, cuiudo!";
     } else {
         $stmt = $conexao->prepare(
-            "UPDATE tarefas SET titulo=?, descricao=?, prioridade=?, status=? WHERE id=? AND usuario_id=?"
+            "UPDATE tarefas SET titulo=?, descricao=?, prioridade=?, status=?, prazo=? WHERE id=? AND usuario_id=?"
         );
-        $stmt->bind_param("ssssii", $titulo, $descricao, $prioridade, $status, $id_tarefa, $usuario_id);
+        $stmt->bind_param("sssssii", $titulo, $descricao, $prioridade, $status, $prazo, $id_tarefa, $usuario_id);
         $stmt->execute() ? $msg = "Tarefa atualizada!" : $erro = "Erro: " . $conexao->error;
         $stmt->close();
     }
@@ -138,11 +148,35 @@ $total     = count($tarefas);
 $pendentes = count(array_filter($tarefas, fn($t) => $t['status'] === 'pendente'));
 $andamento = count(array_filter($tarefas, fn($t) => $t['status'] === 'em andamento'));
 $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'));
+
+$relatorio_status = [];
+$relatorio_tarefas = [];
+$total_recuperacoes = 0;
+$recuperacoes_por_email = [];
+if ($pagina === 'relatorio') {
+    $res = $conexao->query("SELECT status, COUNT(*) AS total FROM tarefas GROUP BY status");
+    while ($row = $res->fetch_assoc()) $relatorio_status[$row['status']] = (int)$row['total'];
+
+    $res = $conexao->query("SELECT t.id, u.emailnumero, t.titulo, t.prioridade, t.status,
+        t.prazo, t.created_at, TIMESTAMPDIFF(DAY, t.created_at, NOW()) AS dias
+        FROM tarefas t INNER JOIN cad_user u ON u.id = t.usuario_id
+        ORDER BY t.created_at DESC");
+    while ($row = $res->fetch_assoc()) $relatorio_tarefas[] = $row;
+
+    $res = $conexao->query("SELECT COUNT(*) AS total FROM historico_recuperacao");
+    $total_recuperacoes = (int)$res->fetch_assoc()['total'];
+    $res = $conexao->query("SELECT email, COUNT(*) AS total,
+        SUM(enviado = 1) AS enviados, MAX(created_at) AS ultimo_envio
+        FROM historico_recuperacao GROUP BY email ORDER BY total DESC, email");
+    while ($row = $res->fetch_assoc()) $recuperacoes_por_email[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -313,6 +347,20 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
     .badge-alta         { background: rgba(255,80,80,0.25);  color: #ff6666; border: 1px solid #ff6666; }
     .badge-media        { background: rgba(255,165,0,0.25);  color: #ffa500; border: 1px solid #ffa500; }
     .badge-baixa        { background: rgba(100,200,100,0.2); color: #88ee88; border: 1px solid #88ee88; }
+    .prazo-atrasado { color: #ff6666; font-weight: bold; }
+    .prazo-ok { color: #aaffaa; }
+
+    .relatorio-acoes { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 18px; }
+    .relatorio-acoes button { background: greenyellow; color: #14220b; font-weight: bold; }
+    .relatorio-acoes button:hover { background: white; }
+    .indicadores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .indicador { background: rgba(0,0,0,0.65); border: 1px solid rgba(173,255,47,0.35); border-radius: 8px; padding: 15px; text-align: left; }
+    .indicador small { color: #aaffaa; display: block; font-size: 12px; }
+    .indicador strong { display: block; font-size: 28px; margin-top: 5px; }
+    .relatorio-tabela { overflow-x: auto; }
+    .relatorio-tabela table { min-width: 760px; }
+    @media (max-width: 800px) { .indicadores { grid-template-columns: 1fr 1fr; } .conteudo { padding: 20px 12px; } }
+    @media (max-width: 520px) { .sidebar { width: 165px; } .indicadores { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -322,7 +370,11 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
     <h2>📋 CUIUDO SYSTEM</h2>
 
     <a href="?pagina=cadastrar" class="<?= $pagina==='cadastrar'?'ativo':'' ?>">➕ Cadastrar Tarefa</a>
-    <a href="?pagina=consultar" class="<?= ($pagina==='consultar'||$pagina==='editar')?'ativo':'' ?>">🔍 Consultar Tarefas</a>
+    <a href="?pagina=consultar" class="<?= ($pagina==='consultar'||$pagina==='editar')?'ativo':'' ?>">🔍 Minhas tarefas</a>
+    <a href="dashboard.php">📈 Dashboard</a>
+    <?php if ($eh_admin): ?>
+    <a href="?pagina=relatorio" class="<?= $pagina==='relatorio'?'ativo':'' ?>">📊 Relatório administrativo</a>
+    <?php endif; ?>
 
     <div class="resumo">
         <strong>Resumo:</strong><br>
@@ -346,11 +398,73 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
     <?php if ($msg)  echo "<p class='msg-ok'>$msg</p>"; ?>
     <?php if ($erro) echo "<p class='msg-err'>$erro</p>"; ?>
 
-    <?php
-    // ════════════════════════════════════════════════
-    // PÁGINA: CADASTRAR
-    // ════════════════════════════════════════════════
-    if ($pagina === 'cadastrar'): ?>
+    <?php if ($pagina === 'relatorio'): ?>
+    <h2 style="margin-bottom:15px;">RELATÓRIO GERAL</h2>
+
+    <div class="relatorio-acoes">
+        <button type="button" onclick="exportarCSV()">📄 Exportar CSV</button>
+        <button type="button" onclick="exportarPDF()">📕 Exportar PDF</button>
+        <button type="button" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
+
+    <div class="indicadores">
+        <div class="indicador"><small>Total de atividades</small><strong><?= count($relatorio_tarefas) ?></strong></div>
+        <div class="indicador"><small>Taxa de conclusão</small><strong><?= count($relatorio_tarefas) ? round(($relatorio_status['concluida'] ?? 0) * 100 / count($relatorio_tarefas), 1) : 0 ?>%</strong></div>
+        <div class="indicador"><small>Em aberto</small><strong><?= ($relatorio_status['pendente'] ?? 0) + ($relatorio_status['em andamento'] ?? 0) ?></strong></div>
+        <div class="indicador"><small>Alta prioridade aberta</small><strong><?= count(array_filter($relatorio_tarefas, fn($t) => $t['prioridade'] === 'alta' && $t['status'] !== 'concluida')) ?></strong></div>
+        <div class="indicador"><small>Tentativas de recuperação</small><strong><?= $total_recuperacoes ?></strong></div>
+    </div>
+
+    <div class="relatorio-tabela" style="margin-bottom:20px;">
+        <table>
+            <tr><th>E-mail</th><th>Tentativas</th><th>Enviadas</th><th>Última tentativa</th></tr>
+            <?php foreach ($recuperacoes_por_email as $recuperacao): ?>
+            <tr>
+                <td><?= htmlspecialchars($recuperacao['email']) ?></td>
+                <td><?= (int)$recuperacao['total'] ?></td>
+                <td><?= (int)$recuperacao['enviados'] ?></td>
+                <td><?= htmlspecialchars($recuperacao['ultimo_envio']) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php if (!$recuperacoes_por_email): ?><tr><td colspan="4">Nenhuma tentativa de recuperação registrada.</td></tr><?php endif; ?>
+        </table>
+    </div>
+
+    <div class="relatorio-tabela">
+        <table id="tabelaRelatorio">
+            <tr><th>Usuário</th><th>Atividade</th><th>Prioridade</th><th>Status</th><th>Prazo</th><th>Criada em</th><th>Idade</th></tr>
+            <?php foreach ($relatorio_tarefas as $t): ?>
+            <tr>
+                <td><?= htmlspecialchars($t['emailnumero']) ?></td>
+                <td><?= htmlspecialchars($t['titulo']) ?></td>
+                <td><?= htmlspecialchars(ucfirst($t['prioridade'])) ?></td>
+                <td><?= htmlspecialchars(ucfirst($t['status'])) ?></td>
+                <td class="<?= ($t['prazo'] && $t['status'] !== 'concluida' && $t['prazo'] < date('Y-m-d')) ? 'prazo-atrasado' : 'prazo-ok' ?>">
+                    <?= $t['prazo'] ? date('d/m/Y', strtotime($t['prazo'])) : 'Sem prazo' ?>
+                </td>
+                <td><?= htmlspecialchars($t['created_at']) ?></td>
+                <td><?= (int)$t['dias'] ?> dia(s)</td>
+            </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+
+    <script>
+    function exportarCSV() {
+        const linhas = [...document.querySelectorAll('#tabelaRelatorio tr')].map(linha => [...linha.cells].map(celula => '"' + celula.innerText.replaceAll('"', '""') + '"').join(';'));
+        const blob = new Blob(['\ufeff' + linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'relatorio-atividades.csv'; link.click(); URL.revokeObjectURL(link.href);
+    }
+    function exportarPDF() {
+        const { jsPDF } = window.jspdf; const pdf = new jsPDF('landscape');
+        pdf.setFontSize(16); pdf.text('Relatorio de atividades', 14, 15);
+        pdf.setFontSize(10); pdf.text('Gerado em ' + new Date().toLocaleString('pt-BR'), 14, 22);
+        pdf.autoTable({ html: '#tabelaRelatorio', startY: 28, styles: { fontSize: 7 }, headStyles: { fillColor: [30, 70, 20] } });
+        pdf.save('relatorio-atividades.pdf');
+    }
+    </script>
+
+    <?php elseif ($pagina === 'cadastrar'): ?>
 
     <h2 style="margin-bottom:15px;">CADASTRA UMA TAREFA AÍ</h2>
 
@@ -370,6 +484,10 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
                 <option value="media" selected>Média</option>
                 <option value="alta">Alta</option>
             </select>
+            <br><br>
+
+            <label>Data para concluir</label>
+            <input name="prazo" type="date" min="<?= date('Y-m-d') ?>">
             <br><br>
 
             <button type="submit" name="cadastrar_tarefa">Cadastra!</button>
@@ -411,6 +529,10 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
                 <option value="em andamento" <?= $tarefa_editar['status']==='em andamento' ?'selected':'' ?>>Em Andamento</option>
                 <option value="concluida"    <?= $tarefa_editar['status']==='concluida'    ?'selected':'' ?>>Concluída</option>
             </select>
+            <br><br>
+
+            <label>Data para concluir</label>
+            <input name="prazo" type="date" value="<?= htmlspecialchars($tarefa_editar['prazo'] ?? '') ?>">
             <br><br>
 
             <button type="submit" name="salvar_edicao">Salva aí!</button>
@@ -472,6 +594,7 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
             <th>Descrição</th>
             <th>Prioridade</th>
             <th>Status</th>
+            <th>Prazo</th>
             <th>Criado em</th>
             <th>Ações</th>
         </tr>
@@ -492,6 +615,9 @@ $concluidas= count(array_filter($tarefas, fn($t) => $t['status'] === 'concluida'
                 <span class="badge badge-<?= $cls ?>">
                     <?= ucfirst($t['status']) ?>
                 </span>
+            </td>
+            <td class="<?= ($t['prazo'] && $t['status'] !== 'concluida' && $t['prazo'] < date('Y-m-d')) ? 'prazo-atrasado' : 'prazo-ok' ?>">
+                <?= $t['prazo'] ? date('d/m/Y', strtotime($t['prazo'])) : 'Sem prazo' ?>
             </td>
             <td><?= $t['created_at'] ?></td>
             <td>
